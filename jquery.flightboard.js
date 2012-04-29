@@ -1,5 +1,5 @@
 /* http://keith-wood.name/flightBoard.html
-   Flight Board for jQuery v1.0.1.
+   Flight Board for jQuery v1.0.2.
    Written by Keith Wood (kbwood{at}iinet.com.au) October 2009.
    Dual licensed under the GPL (http://dev.jquery.com/browser/trunk/jquery/GPL-LICENSE.txt) and 
    MIT (http://dev.jquery.com/browser/trunk/jquery/MIT-LICENSE.txt) licenses. 
@@ -153,7 +153,7 @@ $.extend(FlightBoard.prototype, {
 		}
 		this._stopFlightBoard(target[0]);
 		target.removeClass(this.markerClassName).empty();
-		$('#' + target.id + '_css').remove();
+		$('#' + target[0].id + '_css').remove();
 		$.removeData(target[0], PROP_NAME);
 	},
 
