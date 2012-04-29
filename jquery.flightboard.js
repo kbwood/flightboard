@@ -1,5 +1,5 @@
 /* http://keith-wood.name/flightBoard.html
-   Flight Board for jQuery v1.0.0.
+   Flight Board for jQuery v1.0.1.
    Written by Keith Wood (kbwood{at}iinet.com.au) October 2009.
    Dual licensed under the GPL (http://dev.jquery.com/browser/trunk/jquery/GPL-LICENSE.txt) and 
    MIT (http://dev.jquery.com/browser/trunk/jquery/MIT-LICENSE.txt) licenses. 
@@ -23,6 +23,7 @@ function FlightBoard() {
 		maxLength: 20, // Maximum length of flight board
 		flips: [3, 5], // Number of flips before new value,
 			// may be an array with minimum and maximum flips
+		sequential: false, // True to step through all letters, false for random ones
 		speed: 500, // Time taken (milliseconds) for a single transition
 		repeat: true, // True to automatically trigger a new transition after a pause
 		pause: 2000, // Time (milliseconds) between transitions
@@ -162,9 +163,11 @@ $.extend(FlightBoard.prototype, {
 		target = $(target);
 		var options = $.data(target[0], PROP_NAME);
 		options._current = options._next;
-		options._next = (options.selection == 'random' ? randInt(options.messages.length) :
+		options._next = (options.selection == 'random' ? randInt(options.messages.length - 1) :
 			(options.selection == 'backward' ? options._next + options.messages.length - 1 :
 			options._next + 1)) % options.messages.length;
+		options._next = (options.selection == 'random' && options._next == options._current ?
+			options.messages.length - 1 : options._next);
 		if (options.repeat && !options._timer) {
 			options._timer = setTimeout(function() { $.flightboard._flipFlightBoard(target[0]); },
 				options.pause);
@@ -199,11 +202,20 @@ $.extend(FlightBoard.prototype, {
 				appendTo('body');
 			options._anims.push(animDiv);
 			var count = randInt(flips[1] - flips[0] + 1) + flips[0];
-			var charSeq = cur.charAt(i) || ' ';
-			for (var j = 1; j < count; j++) {
-				charSeq += options.lettersSeq.charAt(randInt(options.lettersSeq.length));
+			var charSeq = '';
+			if (options.sequential) {
+				var start = options.lettersSeq.indexOf(cur.charAt(i) || ' ');
+				var end = options.lettersSeq.indexOf(next.charAt(i) || ' ');
+				charSeq = (start < end ? options.lettersSeq.substring(start, end + 1) :
+					options.lettersSeq.substring(start) + options.lettersSeq.substring(0, end + 1));
 			}
-			charSeq += next.charAt(i) || ' ';
+			else {
+				charSeq = cur.charAt(i) || ' ';
+				for (var j = 1; j < count; j++) {
+					charSeq += options.lettersSeq.charAt(randInt(options.lettersSeq.length));
+				}
+				charSeq += next.charAt(i) || ' ';
+			}
 			var speed = (!isNaN(options.speed) ? options.speed :
 				$.fx.speeds[options.speed] || $.fx.speeds._default);
 			speed = speed * 0.9 + randInt(speed * 0.2);
