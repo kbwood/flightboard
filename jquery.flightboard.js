@@ -1,8 +1,7 @@
 /* http://keith-wood.name/flightBoard.html
-   Flight Board for jQuery v1.1.0.
+   Flight Board for jQuery v1.1.1.
    Written by Keith Wood (kbwood{at}iinet.com.au) October 2009.
-   Dual licensed under the GPL (http://dev.jquery.com/browser/trunk/jquery/GPL-LICENSE.txt) and 
-   MIT (http://dev.jquery.com/browser/trunk/jquery/MIT-LICENSE.txt) licenses. 
+   Available under the MIT (https://github.com/jquery/jquery/blob/master/MIT-LICENSE.txt) license. 
    Please attribute the author if you use it. */
 
 /* Flip text like an airline flight board.
@@ -276,18 +275,18 @@ $.extend(FlightBoard.prototype, {
 			image + '" style="position: relative; left: 0px; top: 0px; width: ' +
 			maxWidth + 'px; height: 0px; vertical-align: top;"></div>';
 		if (inst.options.shading) {
-			controls += ($.browser.msie ? // Shadow
+			controls += (!$.support.opacity ? // Shadow
 				'<img src="' + inst.options.shadingImages[1] + '"' : '<div') +
 				' class="fbsh" style="position: absolute; width: ' + width +
 				'px; background-color: black; opacity: ' + inst.options.opacity +
 				'; filter: alpha(opacity=' + (inst.options.opacity * 100) + ');"' +
-				($.browser.msie ? '/>' : '></div>') +
-				($.browser.msie ? // Highlight
+				(!$.support.opacity ? '/>' : '></div>') +
+				(!$.support.opacity ? // Highlight
 				'<img src="' + inst.options.shadingImages[0] + '"' : '<div') +
 				' class="fbhi" style="position: absolute; top: ' + (height / 2) + 'px; width: ' +
 				width + 'px; height: 0px; background-color: white; opacity: ' +
 				inst.options.opacity + '; filter: alpha(opacity=' + (inst.options.opacity * 100) + ');"' +
-				($.browser.msie ? '/>' : '></div>');
+				(!$.support.opacity ? '/>' : '></div>');
 		}
 		return $(controls + '</div>');
 	},
@@ -343,10 +342,9 @@ $.extend(FlightBoard.prototype, {
 		var stepProps = [];
 		var height = $(cont).height();
 		var children = cont.children || cont.childNodes;
-		var adjustment = ($.browser.mozilla ? 0 : 1);
 		stepProps[0] = {elem: children[2], first: true, props: {
 			top: {start: 0, diff: height, units: 'px', min: -999999},
-			height: {start: height / 2 + adjustment, diff: -height, units: 'px', min: 0}}};
+			height: {start: height / 2 + 1, diff: -height, units: 'px', min: 0}}};
 		stepProps[1] = {elem: children[2].firstChild, first: true, props: {
 			height: {start: height, diff: -2 * height, units: 'px', min: 0}}};
 		stepProps[2] = {elem: children[3], first: false, props: {
@@ -358,7 +356,7 @@ $.extend(FlightBoard.prototype, {
 			var opacity = parseFloat($(children[4]).css('opacity'));
 			stepProps[4] = {elem: children[4], first: true, props: {
 				top: {start: 0, diff: height, units: 'px', min: -999999},
-				height: {start: height / 2 + adjustment, diff: -height, units: 'px', min: 0},
+				height: {start: height / 2 + 1, diff: -height, units: 'px', min: 0},
 				opacity: {start: 0, diff: 2 * opacity, units: '', min: 0}}};
 			stepProps[5] = {elem: children[5], first: false, props: {
 				height: {start: -height / 2, diff: height, units: 'px', min: 0},
@@ -390,7 +388,7 @@ $.fx.step['fbHeight'] = function(fx) {
 				var prop = comp.props[name];
 				comp.elem.style[name] =
 					Math.max(fx.pos * prop.diff + prop.start, prop.min) + prop.units;
-				if ($.browser.msie && name == 'opacity') {
+				if (!$.support.opacity && name == 'opacity') {
 					comp.elem.style.filter = 'alpha(opacity=' +
 						(Math.max(fx.pos * prop.diff + prop.start, prop.min) * 100) + ')';
 				}
