@@ -1,10 +1,10 @@
 /* http://keith-wood.name/flightBoard.html
-   Flight Board for jQuery v1.1.1.
+   Flight Board for jQuery 2.0.0.
    Written by Keith Wood (kbwood{at}iinet.com.au) October 2009.
    Available under the MIT (https://github.com/jquery/jquery/blob/master/MIT-LICENSE.txt) license. 
    Please attribute the author if you use it. */
 
-/* Flip text like an airline flight board.
+/* 
    $('div selector').flightboard();
    Or with options like:
    $('div selector').flightboard({speed: 1000});
@@ -12,96 +12,101 @@
 
 (function($) { // Hide scope, no $ conflict
 
-/* Flight board manager. */
-function FlightBoard() {
-	this._defaults = {
-		lettersImage: 'img/flightBoardLarge.png', // Amalgamated image for letters background
-		lettersSize: [25, 34], // Width and height of individual letters
-		lettersSeq: ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', // Positioning of letters within image
-		messages: ['SEE THE FLIGHT BOARD', 'CHANGE MESSAGES'], // Messages to display
-		maxLength: 20, // Maximum length of flight board
-		flips: [3, 5], // Number of flips before new value,
-			// may be an array with minimum and maximum flips
-		sequential: false, // True to step through all letters, false for random ones
-		speed: 500, // Time taken (milliseconds) for a single transition
-		repeat: true, // True to automatically trigger a new transition after a pause
-		pause: 2000, // Time (milliseconds) between transitions
-		selection: 'forward', // How to choose the next item to show:
-			// 'forward', 'backward', 'random'
-		shading: true, // True to add shading effects, false for no effects
-		opacity: 0.5, // Maximum opacity (0.0 - 1.0) for highlights and shadows
-		// Locations of the highlight/shadow images for IE
+	var pluginName = 'flightboard';
+
+	/** Create the flightboard plugin.
+		<p>Sets up a <code>div</code> to flip text like an airline flight board.</p>
+		<p>Expects HTML like:</p>
+		<pre>&lt;div>&lt;/div></pre>
+		<p>Provide inline configuration like:</p>
+		<pre>&lt;div data-flightboard="name: 'value'">&lt;/div></pre>
+	 	@module FlightBoard
+		@augments JQPlugin
+		@example $(selector).flightboard()
+ $(selector).flightboard({speed: 1000, messages: ['First', 'Second']}) */
+	$.JQPlugin.createPlugin({
+	
+		/** The name of the plugin. */
+		name: pluginName,
+
+		/** Flight board before flip callback.
+			Triggered just before the message is to change.
+			@callback FlightBoardBeforeFlip
+			@param current {string} The current message showing.
+			@param next {string} The next message to show.
+			@example beforeFlip: function(current, next) {
+ 	$('#status').text('Was showing ' + current);
+ } */
+
+		/** Flight board after flip callback.
+			Triggered just after the message has changed.
+			@callback FlightBoardAfterFlip
+			@param prev {string} The previous message showing.
+			@param current {string} The current message showing.
+			@example afterFlip: function(prev, current) {
+ 	$('#status').text('Now showing ' + current);
+ } */
+			
+		/** Default settings for the plugin.
+			@property [lettersImage='img/flightBoardLarge.png'] {string} Amalgamated image for letters background.
+			@property [lettersSize=[25,34]] {number[]} Width and height of individual letters.
+			@property [lettersSeq='&nbsp;ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'] {string}
+						Positioning of letters within image.
+			@property [messages=['SEE&nbsp;THE&nbsp;FLIGHT&nbsp;BOARD','CHANGE&nbsp;MESSAGES']] {string[]}
+						Messages to display.
+			@property [maxLength=20] {number} Maximum length of flight board.
+			@property [flips=[3,5]] {number[]} Number of flips before new value,
+						may be an array with minimum and maximum flips.
+			@property [sequential=false] {boolean} <code>true</code> to step through all letters, <code>false</code> for random ones.
+			@property [speed=500] {number} Time taken (milliseconds) for a single transition.
+			@property [repeat=true] {boolean} <code>true</code> to automatically trigger a new transition after a pause.
+			@property [pause=2000] {number} Time (milliseconds) between transitions.
+			@property [selection='forward'] {string} How to choose the next item to show:
+						'forward', 'backward', 'random'.
+			@property [shading=true] {boolean} <code>true</code> to add shading effects, <code>false</code> for no effects.
+			@property [opacity=0.5] {number} Maximum opacity (0.0 - 1.0) for highlights and shadows.
+			@property [shadingImages=['img/flightBoardHigh.png','img/flightBoardShad.png']] {string[]}
+						Locations of the highlight/shadow images for IE.
+			@property [beforeFlip=null] {FlightBoardBeforeFlip} Callback before flipping.
+			@property [afterFlip=null] {FlightBoardAfterFlip} Callback after flipping. */
+		defaultOptions: {
+			lettersImage: 'img/flightBoardLarge.png',
+			lettersSize: [25, 34],
+			lettersSeq: ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+			messages: ['SEE THE FLIGHT BOARD', 'CHANGE MESSAGES'],
+			maxLength: 20,
+			flips: [3, 5],
+			sequential: false,
+			speed: 500,
+			repeat: true,
+			pause: 2000,
+			selection: 'forward',
+			shading: true,
+			opacity: 0.5,
 		shadingImages: ['img/flightBoardHigh.png', 'img/flightBoardShad.png'],
-		beforeFlip: null, // Callback before flipping
-		afterFlip: null // Callback after flipping
-	};
-	this._uuid = new Date().getTime();
-}
+			beforeFlip: null,
+			afterFlip: null
+		},
+		
+		_getters: ['current', 'next'],
 
-$.extend(FlightBoard.prototype, {
-	/* Class name added to elements to indicate already configured with flight board. */
-	markerClassName: 'hasFlightBoard',
-	/* Name of the data property for instance settings. */
-	propertyName: 'flightBoard',
+		_uuid: new Date().getTime(),
 
-	/* Override the default settings for all flight board instances.
-	   @param  options  (object) the new settings to use as defaults
-	   @return  (FlightBoard) this object */
-	setDefaults: function(options) {
-		$.extend(this._defaults, options || {});
-		return this;
-	},
+		_instSettings: function(elem, options) {
+			return {_current: 0, _next: 0, _anims: []};
+		},
 
-	/* Attach the flight board functionality to a div.
-	   @param  target   (element) the containing division
-	   @param  options  (object) the settings for this instance (optional) */
-	_attachPlugin: function(target, options) {
-		target = $(target);
-		if (target.hasClass(this.markerClassName)) {
-			return;
-		}
-		var inst = {_current: 0, _next: 0, _anims: [],
-			options: $.extend({}, this._defaults, options || {})};
-		target.addClass(this.markerClassName).data(this.propertyName, inst);
-		this._optionPlugin(target, options);
-	},
-
-	/* Retrieve or reconfigure the settings for a max length control.
-	   @param  target     (element) the control to affect
-	   @param  options    (object) the new options for this instance or
-	                      (string) an individual property name
-	   @param  value      (any) the individual property value (omit if options
-	                      is an object or to retrieve the value of a setting)
-	   @param  dontReset  (boolean, internal) true to not reset the current message
-	   @return  (any) if retrieving a value */
-	_optionPlugin: function(target, options, value, dontReset) {
-		target = $(target);
-		if (!options || (typeof options == 'string' && value == null)) { // Get option
-			var inst = target.data(this.propertyName);
-			var name = options;
-			options = (inst || {}).options;
-			return (options && name ? options[name] : options);
-		}
-
-		if (!target.hasClass(this.markerClassName)) {
-			return;
-		}
-		options = options || {};
-		if (typeof options == 'string') {
-			var name = options;
-			options = {};
-			options[name] = value;
-		}
-		this._stopPlugin(target[0], true);
-		var inst = target.data(this.propertyName);
+		_optionsChanged: function(elem, inst, options) {
+			this.stop(elem[0], true);
 		$.extend(inst.options, options);
-		var current = (dontReset ? Math.min(inst._current, inst.options.messages.length - 1) : 0);
+			var current = (inst._dontReset ? Math.min(inst._current, inst.options.messages.length - 1) : 0);
+			inst._dontReset = false;
 		$.extend(inst, {_current: current, _next: current, _anims: []});
-		if (!target[0].id) {
-			target[0].id = 'fb' + this._uuid++;
+			if (!elem[0].id) {
+				elem[0].id = 'fb' + this._uuid++;
 		}
-		$('#' + target[0].id + '_css').remove();
-		$('<style type="text/css" id="' + target[0].id + '_css">#' + target[0].id +
+			$('#' + elem[0].id + '_css').remove();
+			$('<style type="text/css" id="' + elem[0].id + '_css">#' + elem[0].id +
 				' span { display: block; float: left; width: ' + inst.options.lettersSize[0] +
 				'px; height: ' + inst.options.lettersSize[1] + 'px; background: url(' +
 				inst.options.lettersImage + ') center no-repeat; }</style>').
@@ -114,48 +119,37 @@ $.extend(FlightBoard.prototype, {
 				(Math.max(0, inst.options.lettersSeq.indexOf(message.charAt(i) || ' ')) *
 				inst.options.lettersSize[0]) + 'px 0px;"></span>';
 		}
-		target.html(html);
-		this._prepareFlip(target[0]);
+			elem.html(html);
+			this._prepareFlip(elem[0]);
+		},
+		
+		_preDestroy: function(elem, inst) {
+			this.stop(elem[0]);
+			elem.empty();
+			$('#' + elem[0].id + '_css').remove();
+		},
+
+		/** Retrieve the currently visible message of a flight board <code>div</code>.
+			@param elem {Element} The containing division.
+			@return {Element} The currently displayed message. */
+		current: function(elem) {
+			var inst = this._getInst(elem);
+			return ($(elem).hasClass(this._getMarker()) ? inst.options.messages[inst._current] : null);
 	},
 
-	/* Remove the flight board functionality from a div.
-	   @param  target  (element) the containing division */
-	_destroyPlugin: function(target) {
-		target = $(target);
-		if (!target.hasClass(this.markerClassName)) {
-			return;
-		}
-		this._stopPlugin(target[0]);
-		target.removeClass(this.markerClassName).empty().removeData(this.propertyName);
-		$('#' + target[0].id + '_css').remove();
-	},
+		/** Retrieve the next visible message of a flight board <code>div</code>.
+			@param elem {Element} The containing division.
+			@return {Element} The next to be displayed message. */
+		next: function(elem) {
+			var inst = this._getInst(elem);
+			return ($(elem).hasClass(this._getMarker()) ? inst.options.messages[inst._next] : null);
+		},
 
-	/* Retrieve the currently visible child of a flight board div.
-	   @param  target  (element) the containing division
-	   @return  (element) the currently displayed child of target division */
-	_currentPlugin: function(target) {
-		target = $(target);
-		var inst = target.data(this.propertyName);
-		return (target.hasClass(this.markerClassName) ?
-			inst.options.messages[inst._current] : null);
-	},
-
-	/* Retrieve the next visible child of a flight board div.
-	   @param  target  (element) the containing division
-	   @return  (element) the next to be displayed child of target division */
-	_nextPlugin: function(target) {
-		target = $(target);
-		var inst = target.data(this.propertyName);
-		return (target.hasClass(this.markerClassName) ?
-			inst.options.messages[inst._next] : null);
-	},
-
-	/* Stop the flight board automatically flipping to the next value.
-	   @param  target     (element) the containing division
-	   @param  timerOnly  (boolean) true if only temporarily stopping (optional) */
-	_stopPlugin: function(target, timerOnly) {
-		target = $(target);
-		var inst = target.data(this.propertyName);
+		/** Stop the flight board automatically flipping to the next value.
+			@param elem {Element} The containing division.
+			@param [timerOnly=false] {boolean} <code>true</code> if only temporarily stopping (internal). */
+		stop: function(elem, timerOnly) {
+			var inst = this._getInst(elem);
 		if (inst._timer) {
 			clearTimeout(inst._timer);
 			inst._timer = null;
@@ -164,53 +158,55 @@ $.extend(FlightBoard.prototype, {
 			inst._anims[i].stop().remove();
 		}
 		if (!timerOnly) {
-			this._optionPlugin(target[0], 'repeat', false, true);
+				inst._dontReset = true;
+				this.option(elem, 'repeat', false);
 		}
 	},
 
-	/* Start the flight board automatically flipping to the next value.
-	   @param  target  (element) the containing division */
-	_startPlugin: function(target) {
-		this._optionPlugin(target, 'repeat', true, true);
+		/** Start the flight board automatically flipping to the next value.
+			@param elem {Element} The containing division. */
+		start: function(elem) {
+			var inst = this._getInst(elem);
+			inst._dontReset = true;
+			this.option(elem, 'repeat', true);
 	},
 
-	/* Note current visible child and schedule a repeat rotation (if required).
-	   @param  target  (element) the containing division */
-	_prepareFlip: function(target) {
-		target = $(target);
-		var inst = target.data(this.propertyName);
+		/** Note current visible child and schedule a repeat rotation (if required).
+			@private
+			@param elem {Element} The containing division. */
+		_prepareFlip: function(elem) {
+			var inst = this._getInst(elem);
 		inst._current = inst._next;
-		inst._next = (inst.options.selection == 'random' ? randInt(inst.options.messages.length - 1) :
-			(inst.options.selection == 'backward' ? inst._next + inst.options.messages.length - 1 :
+			inst._next = (inst.options.selection === 'random' ? randInt(inst.options.messages.length - 1) :
+				(inst.options.selection === 'backward' ? inst._next + inst.options.messages.length - 1 :
 			inst._next + 1)) % inst.options.messages.length;
-		inst._next = (inst.options.selection == 'random' && inst._next == inst._current ?
+			inst._next = (inst.options.selection === 'random' && inst._next === inst._current ?
 			inst.options.messages.length - 1 : inst._next);
 		if (inst.options.repeat && !inst._timer) {
-			inst._timer = setTimeout(function() { plugin._flipPlugin(target[0]); },
-				inst.options.pause);
+				inst._timer = setTimeout(function() { plugin.flip(elem); }, inst.options.pause);
 		}
 	},
 
-	/* Flip the flight board to the next value.
-	   @param  target    (element) the containing division
-	   @param  next      (int) index of next message to show (optional) */
-	_flipPlugin: function(target, next) {
-		this._stopPlugin(target, true);
-		var inst = $.data(target, this.propertyName);
+		/** Flip the flight board to the next value.
+			@param elem {Element} The containing division.
+			@param [next] {int} Index of next message to show. */
+		flip: function(elem, next) {
+			this.stop(elem, true);
+			var inst = this._getInst(elem);
 		if (next != null) {
 			if (next >= 0 && next <= inst.options.messages.length) {
 				inst._next = next;
 			}
 		}
 		inst._count = inst.options.maxLength;
-		if (inst.options.beforeFlip) {
-			inst.options.beforeFlip.apply(target,
+			if (inst.options.beforeFlip && $.isFunction(inst.options.beforeFlip)) {
+				inst.options.beforeFlip.apply(elem,
 				[inst.options.messages[inst._current], inst.options.messages[inst._next]]);
 		}
 		inst._anims = [];
 		var cur = inst.options.messages[inst._current];
 		var next = inst.options.messages[inst._next];
-		var offset = $(target).offset();
+			var offset = $(elem).offset();
 		var flips = ($.isArray(inst.options.flips) ? inst.options.flips :
 			[inst.options.flips, inst.options.flips]);
 		var template = this._charTemplate(inst);
@@ -238,14 +234,14 @@ $.extend(FlightBoard.prototype, {
 			var speed = (!isNaN(inst.options.speed) ? inst.options.speed :
 				$.fx.speeds[inst.options.speed] || $.fx.speeds._default);
 			speed = speed * 0.9 + randInt(speed * 0.2);
-			this._flipChar(target, animDiv, inst, $('span:eq(' + i + ')', target),
-				charSeq, speed);
+				this._flipChar(elem, animDiv, inst, $('span:eq(' + i + ')', elem), charSeq, speed);
 		}
 	},
 
-	/* Create a template for a single character animation.
-	   @param  inst  (object) the current settings
-	   @return  (jQuery) the character template */
+		/** Create a template for a single character animation.
+			@private
+			@param inst {object} The current settings.
+			@return {jQuery} The character template. */
 	_charTemplate: function(inst) {
 		var image = inst.options.lettersImage;
 		var width = inst.options.lettersSize[0];
@@ -291,53 +287,56 @@ $.extend(FlightBoard.prototype, {
 		return $(controls + '</div>');
 	},
 
-	/* Monitor character animations and continue after all are complete.
-	   @param  target  (element)  the containing division */
-	_finishedChar: function(target) {
-		var inst = $.data(target, this.propertyName);
+		/** Monitor character animations and continue after all are complete.
+			@private
+			@param elem {Element} The containing division. */
+		_finishedChar: function(elem) {
+			var inst = this._getInst(elem);
 		inst._count--;
-		if (inst._count == 0) {
+			if (inst._count === 0) {
 			var lastFlip = [inst.options.messages[inst._current], inst.options.messages[inst._next]];
-			this._prepareFlip(target);
-			if (inst.options.afterFlip) {
-				inst.options.afterFlip.apply(target, lastFlip);
+				this._prepareFlip(elem);
+				if (inst.options.afterFlip && $.isFunction(inst.options.afterFlip)) {
+					inst.options.afterFlip.apply(elem, lastFlip);
 			}
 		}
 	},
 
-	/* Flip a single letter through a series of changes.
-	   @param  target    (element) the containing division
-	   @param  animDiv   (jQuery) controls for a single character animation
-	   @param  inst      (object) the current settings
-	   @param  charSpan  (number) the span for the character in the message
-	   @param  charSeq   (string) the letters to flip through
-	   @param  speed     (number) the speed of the animation */
-	_flipChar: function(target, animDiv, inst, charSpan, charSeq, speed) {
+		/** Flip a single letter through a series of changes.
+			@private
+			@param elem {Element} The containing division.
+			@param animDiv {jQuery} Controls for a single character animation.
+			@param inst {object} The current settings.
+			@param charSpan {number} The span for the character in the message.
+			@param charSeq {string} The letters to flip through.
+			@param speed {number} The speed of the animation. */
+		_flipChar: function(elem, animDiv, inst, charSpan, charSeq, speed) {
 		if (charSeq.length < 2) {
-			animDiv.remove().removeData(plugin.propertyName);
-			plugin._finishedChar(target);
+				animDiv.remove().removeData(inst.name);
+				plugin._finishedChar(elem);
 			return;
 		}
 		var width = inst.options.lettersSize[0];
 		var fromIndex = inst.options.lettersSeq.indexOf(charSeq.charAt(0));
 		var toIndex = inst.options.lettersSeq.indexOf(charSeq.charAt(1));
-		var elem = animDiv[0].firstChild;
-		$(elem.firstChild).css('left', -toIndex * width); // New top
-		elem = elem.nextSibling;
-		$(elem.firstChild).css('left', -fromIndex * width); // Old bottom
-		elem = elem.nextSibling;
-		$(elem.firstChild).css('left', -fromIndex * width); // Old top
-		elem = elem.nextSibling;
-		$(elem).css('height', 0); // New bottom
-		$(elem.firstChild).css('left', -toIndex * width);
-		animDiv.data(plugin.propertyName, {span: charSpan, offset: -toIndex * width});
-		animDiv.animate({fbHeight: 1}, speed, function() {
-			plugin._flipChar(target, animDiv, inst, charSpan, charSeq.substring(1), speed);
+			var curElem = animDiv[0].firstChild;
+			$(curElem.firstChild).css('left', -toIndex * width); // New top
+			curElem = curElem.nextSibling;
+			$(curElem.firstChild).css('left', -fromIndex * width); // Old bottom
+			curElem = curElem.nextSibling;
+			$(curElem.firstChild).css('left', -fromIndex * width); // Old top
+			curElem = curElem.nextSibling;
+			$(curElem).css('height', 0); // New bottom
+			$(curElem.firstChild).css('left', -toIndex * width);
+			animDiv.data(inst.name, {span: charSpan, offset: -toIndex * width}).
+				animate({fbHeight: 1}, speed, function() {
+					plugin._flipChar(elem, animDiv, inst, charSpan, charSeq.substring(1), speed);
 		});
 	},
 
-	/* Define the animation elements and attributes.
-	   @param  cont  (jQuery) the elements' container */
+		/** Define the animation elements and attributes.
+			@private
+			@param cont {jQuery} The elements' container. */
 	_getStepProps: function(cont) {
 		var stepProps = [];
 		var height = $(cont).height();
@@ -364,18 +363,21 @@ $.extend(FlightBoard.prototype, {
 		}
 		return stepProps;
 	}
-});
+	});
 
-/* Get a random number.
-   @param  range  (number) the maximum value
-   @return  (number) random value 0 <= x < range */
-function randInt(range) {
+	var plugin = $.flightboard; // Singleton instance
+
+	/** Get a random number.
+		@private
+		@param range {number} The maximum value.
+		@return {number} Random value 0 <= x < range. */
+	function randInt(range) {
 	return Math.floor(Math.random() * range);
-}
+	}
 
-/* Custom animation step for the flight board to synchronise components.
-   @param  fx  (object) the animation definition */
-$.fx.step['fbHeight'] = function(fx) {
+	/** Custom animation step for the flight board to synchronise components.
+		@param fx {object} The animation definition. */
+	$.fx.step['fbHeight'] = function(fx) {
 	if (!fx.stepProps) { // Initialisation
 		fx.stepProps = plugin._getStepProps(fx.elem);
 		fx.first = true;
@@ -383,12 +385,12 @@ $.fx.step['fbHeight'] = function(fx) {
 
 	for (var i = 0; i < fx.stepProps.length; i++) { // Update all components
 		var comp = fx.stepProps[i];
-		if (fx.first == comp.first) {
+			if (fx.first === comp.first) {
 			for (var name in comp.props) { // Update all properties
 				var prop = comp.props[name];
 				comp.elem.style[name] =
 					Math.max(fx.pos * prop.diff + prop.start, prop.min) + prop.units;
-				if (!$.support.opacity && name == 'opacity') {
+					if (!$.support.opacity && name === 'opacity') {
 					comp.elem.style.filter = 'alpha(opacity=' +
 						(Math.max(fx.pos * prop.diff + prop.start, prop.min) * 100) + ')';
 				}
@@ -400,55 +402,12 @@ $.fx.step['fbHeight'] = function(fx) {
 		fx.first = false; // Second half
 	}
 
-	if (fx.pos == 1) { // Tidy up afterwards
-		var data = $.data(fx.elem, plugin.propertyName);
+		if (fx.pos === 1) { // Tidy up afterwards
+			var data = $.data(fx.elem, pluginName);
 		if (data) {
 			data.span.css('background-position', data.offset + 'px 0px');
 		}
 	}
-};
-
-// The list of commands that return values and don't permit chaining
-var getters = ['current', 'next'];
-
-/* Determine whether a command is a getter and doesn't permit chaining.
-   @param  command    (string, optional) the command to run
-   @param  otherArgs  ([], optional) any other arguments for the command
-   @return  true if the command is a getter, false if not */
-function isNotChained(command, otherArgs) {
-	if (command == 'option' && (otherArgs.length == 0 ||
-			(otherArgs.length == 1 && typeof otherArgs[0] == 'string'))) {
-		return true;
-	}
-	return $.inArray(command, getters) > -1;
-}
-
-/* Attach the flight board functionality to a jQuery selection.
-   @param  options  (object) the new settings to use for these instances (optional) or
-                    (string) the command to run (optional)
-   @return  (jQuery) for chaining further calls or
-            (any) getter value */
-$.fn.flightboard = function(options) {
-	var otherArgs = Array.prototype.slice.call(arguments, 1);
-	if (isNotChained(options, otherArgs)) {
-		return plugin['_' + options + 'Plugin'].
-			apply(plugin, [this[0]].concat(otherArgs));
-	}
-	return this.each(function() {
-		if (typeof options == 'string') {
-			if (!plugin['_' + options + 'Plugin']) {
-				throw 'Unknown command: ' + options;
-			}
-			plugin['_' + options + 'Plugin'].
-				apply(plugin, [this].concat(otherArgs));
-		}
-		else {
-			plugin._attachPlugin(this, options || {});
-		}
-	});
-};
-
-/* Initialise the flight board functionality. */
-var plugin = $.flightboard = new FlightBoard(); // Singleton instance
+	};
 
 })(jQuery);
